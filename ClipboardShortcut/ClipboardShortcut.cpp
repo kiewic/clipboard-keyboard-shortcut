@@ -2,21 +2,52 @@
 //
 
 #include "stdafx.h"
+#include <memory>
 
 // See: https://msdn.microsoft.com/en-us/library/dd375731.aspx
 const UINT KeyV = 0x56;
 //const UINT ControlKey = 0x11;
 const UINT ControlKey = 0xA2;
 
+int MainCore();
 void CopyToClipboard();
 void Paste();
 
+
+int main()
+{
+    return MainCore();
+}
 
 int CALLBACK WinMain(
     _In_ HINSTANCE hInstance,
     _In_ HINSTANCE hPrevInstance,
     _In_ LPSTR     lpCmdLine,
     _In_ int       nCmdShow)
+{
+    return MainCore();
+}
+
+int CommandHelp()
+{
+    wprintf(L"Usage:\r\n");
+    wprintf(L"  --help             prints this help message\r\n");
+    wprintf(L"  --install <value>  run the application at windows startup and/or sets a new value to copy to the clipboard\r\n");
+    wprintf(L"  --uninstall        removes application from windows startup\r\n");
+    return 0;
+}
+
+int CommandInstall()
+{
+    return 0;
+}
+
+int CommandUninstall()
+{
+    return 0;
+}
+
+int RunMessageLoop()
 {
     BOOL result = RegisterHotKey(NULL, 1, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, KeyV);
     printf("%d\n", result);
@@ -36,6 +67,37 @@ int CALLBACK WinMain(
     }
 
     return 0;
+}
+
+int MainCore()
+{
+    LPWSTR commandLine = GetCommandLineW();
+    int argc;
+    std::unique_ptr<LPWSTR, decltype(&::LocalFree)> argv(
+        CommandLineToArgvW(commandLine, &argc),
+        ::LocalFree);
+
+    for (int i = 0; i < argc; i++)
+    {
+        wprintf(L"%s\n", argv.get()[i]); // TODO: Remove
+
+        if (_wcsicmp(argv.get()[i], L"--help") == 0)
+        {
+            return CommandHelp();
+        }
+
+        if (_wcsicmp(argv.get()[i], L"--install") == 0)
+        {
+            return CommandInstall();
+        }
+
+        if (_wcsicmp(argv.get()[i], L"--uninstall") == 0)
+        {
+            return CommandUninstall();
+        }
+    }
+
+    return RunMessageLoop();
 }
 
 void CopyToClipboard()
