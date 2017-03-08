@@ -2,7 +2,10 @@
 //
 
 #include "stdafx.h"
+#include <Shlwapi.h>
 #include <memory>
+
+#pragma comment(lib, "Shlwapi.lib")
 
 // See: https://msdn.microsoft.com/en-us/library/dd375731.aspx
 const UINT KeyV = 0x56;
@@ -12,7 +15,6 @@ const UINT ControlKey = 0xA2;
 int MainCore();
 void CopyToClipboard();
 void Paste();
-
 
 int main()
 {
@@ -37,8 +39,61 @@ int CommandHelp()
     return 0;
 }
 
+void PrintErrorDescription(DWORD error)
+{
+    LPWSTR pBuffer = NULL;
+    FormatMessage(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER |
+        FORMAT_MESSAGE_FROM_SYSTEM,
+        NULL,
+        error,
+        0,
+        (LPWSTR)&pBuffer,
+        0,
+        NULL);
+    wprintf(pBuffer);
+    LocalFree(pBuffer);
+}
+
 int CommandInstall()
 {
+    DWORD exeNameLen;
+    WCHAR exeName[MAX_PATH + 1];
+    exeNameLen = GetModuleFileName(NULL, exeName, MAX_PATH);
+    if (exeNameLen == 0)
+    {
+        return GetLastError();
+    }
+
+    //Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+    //key.SetValue(curAssembly.GetName().Name, curAssembly.Location);
+
+    LSTATUS status;
+    HKEY regKey;
+    status = RegOpenKeyEx(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_QUERY_VALUE | KEY_SET_VALUE, &regKey);
+    if (status != ERROR_SUCCESS)
+    {
+        PrintErrorDescription(status);
+        return status;
+    }
+
+    LPWSTR fileName = PathFindFileName(exeName);
+    status = RegSetValueExW(regKey, fileName, NULL, REG_SZ, reinterpret_cast<BYTE*>(exeName), (exeNameLen + 1) * sizeof(WCHAR));
+    if (status != ERROR_SUCCESS)
+    {
+        PrintErrorDescription(status);
+        return status;
+    }
+
+    status = RegCloseKey(regKey);
+    if (status != ERROR_SUCCESS)
+    {
+        PrintErrorDescription(status);
+        return status;
+    }
+
+    wprintf(L"Successfully installed!");
+
     return 0;
 }
 
