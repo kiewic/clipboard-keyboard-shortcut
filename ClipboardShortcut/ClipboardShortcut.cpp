@@ -40,7 +40,7 @@ int CommandHelp()
     return 0;
 }
 
-int CommandInstall()
+int CommandInstall(_In_z_ LPCWSTR copyToClipboardValue)
 {
     DWORD exeNameLen;
     WCHAR exeName[MAX_PATH + 1];
@@ -59,12 +59,11 @@ int CommandInstall()
         return status;
     }
 
-    LPCWSTR commonString = L"hola@kiewic.com";
     status = WriteKey(
         L"SOFTWARE\\Kiewic\\ClipboardShortcut\\CurrentVersion",
         L"CopyMe",
-        commonString,
-        static_cast<int>(wcslen(commonString)));
+        copyToClipboardValue,
+        static_cast<int>(wcslen(copyToClipboardValue)));
     if (status != ERROR_SUCCESS)
     {
         return status;
@@ -77,13 +76,17 @@ int CommandInstall()
 
 int CommandUninstall()
 {
+    // TODO: Implement
     return 0;
 }
 
 int RunMessageLoop()
 {
     BOOL result = RegisterHotKey(NULL, 1, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'C');
-    printf("%d\n", result);
+    if (result == 0)
+    {
+        return GetLastError();
+    }
 
     if (result)
     {
@@ -92,7 +95,7 @@ int RunMessageLoop()
         {
             if (msg.message == WM_HOTKEY)
             {
-                printf("Hotkey!\n");
+                printf("Hotkey pressed!\n");
                 LSTATUS status = CopyToClipboard();
                 if (status != ERROR_SUCCESS)
                 {
@@ -122,7 +125,7 @@ int MainCore()
 
         if (_wcsicmp(argv.get()[i], L"--install") == 0)
         {
-            return CommandInstall();
+            return CommandInstall(i + 1 < argc ? argv.get()[i + 1] : L"");
         }
 
         if (_wcsicmp(argv.get()[i], L"--uninstall") == 0)
