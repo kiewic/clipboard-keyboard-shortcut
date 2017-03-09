@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include <Shlwapi.h>
 #include <memory>
+#include "RegistryHelpers.h"
 
 #pragma comment(lib, "Shlwapi.lib")
 
@@ -13,7 +14,7 @@ const UINT KeyV = 0x56;
 const UINT ControlKey = 0xA2;
 
 int MainCore();
-void CopyToClipboard();
+int CopyToClipboard();
 void Paste();
 
 int main()
@@ -39,22 +40,6 @@ int CommandHelp()
     return 0;
 }
 
-void PrintErrorDescription(DWORD error)
-{
-    LPWSTR pBuffer = NULL;
-    FormatMessage(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER |
-        FORMAT_MESSAGE_FROM_SYSTEM,
-        NULL,
-        error,
-        0,
-        (LPWSTR)&pBuffer,
-        0,
-        NULL);
-    wprintf(pBuffer);
-    LocalFree(pBuffer);
-}
-
 int CommandInstall()
 {
     DWORD exeNameLen;
@@ -65,30 +50,23 @@ int CommandInstall()
         return GetLastError();
     }
 
-    //Microsoft.Win32.RegistryKey key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-    //key.SetValue(curAssembly.GetName().Name, curAssembly.Location);
+    LPWSTR fileName = PathFindFileName(exeName);
 
     LSTATUS status;
-    HKEY regKey;
-    status = RegOpenKeyEx(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_QUERY_VALUE | KEY_SET_VALUE, &regKey);
+    status = WriteKey(L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", fileName, exeName, exeNameLen);
     if (status != ERROR_SUCCESS)
     {
-        PrintErrorDescription(status);
         return status;
     }
 
-    LPWSTR fileName = PathFindFileName(exeName);
-    status = RegSetValueExW(regKey, fileName, NULL, REG_SZ, reinterpret_cast<BYTE*>(exeName), (exeNameLen + 1) * sizeof(WCHAR));
+    LPCWSTR commonString = L"hola@kiewic.com";
+    status = WriteKey(
+        L"SOFTWARE\\Kiewic\\ClipboardShortcut\\CurrentVersion",
+        L"CopyMe",
+        commonString,
+        static_cast<int>(wcslen(commonString)));
     if (status != ERROR_SUCCESS)
     {
-        PrintErrorDescription(status);
-        return status;
-    }
-
-    status = RegCloseKey(regKey);
-    if (status != ERROR_SUCCESS)
-    {
-        PrintErrorDescription(status);
         return status;
     }
 
@@ -104,7 +82,7 @@ int CommandUninstall()
 
 int RunMessageLoop()
 {
-    BOOL result = RegisterHotKey(NULL, 1, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, KeyV);
+    BOOL result = RegisterHotKey(NULL, 1, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'C');
     printf("%d\n", result);
 
     if (result)
@@ -115,8 +93,11 @@ int RunMessageLoop()
             if (msg.message == WM_HOTKEY)
             {
                 printf("Hotkey!\n");
-                CopyToClipboard();
-                //Paste();
+                LSTATUS status = CopyToClipboard();
+                if (status != ERROR_SUCCESS)
+                {
+                    return status;
+                }
             }
         }
     }
@@ -134,8 +115,6 @@ int MainCore()
 
     for (int i = 0; i < argc; i++)
     {
-        wprintf(L"%s\n", argv.get()[i]); // TODO: Remove
-
         if (_wcsicmp(argv.get()[i], L"--help") == 0)
         {
             return CommandHelp();
@@ -155,17 +134,27 @@ int MainCore()
     return RunMessageLoop();
 }
 
-void CopyToClipboard()
+int CopyToClipboard()
 {
-    const char* output = "hello@kiewic.com";
-    const size_t len = strlen(output) + 1;
+    LSTATUS status;
+    std::unique_ptr<WCHAR, decltype(&::CallHeapFree)> str(nullptr, ::CallHeapFree);
+    DWORD strLen;
+    status = ReadKey(L"SOFTWARE\\Kiewic\\ClipboardShortcut\\CurrentVersion", L"CopyMe", str, &strLen);
+    if (status != ERROR_SUCCESS)
+    {
+        return status;
+    }
+
+    const size_t len = (strLen + 1) * sizeof(WCHAR);
     HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, len);
-    memcpy(GlobalLock(hMem), output, len);
+    memcpy(GlobalLock(hMem), str.get(), len);
     GlobalUnlock(hMem);
     OpenClipboard(0);
     EmptyClipboard();
-    SetClipboardData(CF_TEXT, hMem);
+    SetClipboardData(CF_UNICODETEXT, hMem);
     CloseClipboard();
+
+    return ERROR_SUCCESS;
 }
 
 void DebugResult(UINT result)

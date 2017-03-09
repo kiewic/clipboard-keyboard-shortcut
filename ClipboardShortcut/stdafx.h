@@ -9,6 +9,7 @@
 
 #include <Windows.h>
 #include <cstdio>
+#include <memory>
 
 
 // TODO: reference additional headers your program requires here
