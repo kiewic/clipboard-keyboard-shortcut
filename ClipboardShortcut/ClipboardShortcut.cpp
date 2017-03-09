@@ -17,10 +17,10 @@ int MainCore();
 int CopyToClipboard();
 void Paste();
 
-int main()
-{
-    return MainCore();
-}
+//int main()
+//{
+//    return MainCore();
+//}
 
 int CALLBACK WinMain(
     _In_ HINSTANCE hInstance,
